@@ -1,4 +1,4 @@
-## Netflix COM-245 Final Project**
+## Netflix COM-245 Final Project
 
 This project is about taking in data from publically available Netflix data and do analysis on it. I will make plots using the R ggplot2 package as well as use the tidyverse package to filter and orangize the data. Finally, I will be doing some statistical analysis on the data such as a t-tests and chi squared tests.
 
