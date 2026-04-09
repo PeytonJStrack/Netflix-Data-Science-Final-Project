@@ -1,0 +1,265 @@
+---
+Title: Netflix Demographic Data
+Author: Peyton Strack
+execute: 
+  echo: FALSE
+---
+
+# Netflix Demographic Data
+
+For a multibillion dollar company, it is important to invest into the things that are making you money. For Netflix, that's the films and TV shows that are on the platform. From international to US produced media to most popular directors and actors to what age groups dominate the platform, demographic data gives huge insights into where time and money needs to be invested in.
+
+## Data Preparation
+
+```{r}
+#| output: false
+#| echo: TRUE
+library(tidyverse)
+library(showtext)
+
+font_add(family = "sunset_boulevard", regular = "C:/Users/pstrack/AppData/Local/Microsoft/Windows/Fonts/Sunset Boulevard.otf")
+showtext_auto()
+
+n_df <- read.csv("netflix_titles.csv")
+
+n_df %>%
+  filter(release_year >= 2000) -> n_df
+
+n_df$date_added <- mdy(n_df$date_added)
+n_df$year_added <- year(n_df$date_added)
+
+```
+The tidyverse library as well as the showtext library were imported. Tidyverse enables us to perform data manipulation while showtext allows us to use custom font in our data visualization. After this, the custom font  is retrieved from the computer. 
+
+The data, in the form of a .csv file, is imported and assigned to a dataframe simply called n_df standing for Netflix dataframe. The dataframe is then filtered to only include entries for films released in the year 2000 and later as content released before this year becomes very sparse. Finally, using lubridate which is a part of the tidyverse package, to format the "date_added" column in a form recognizable to lubridate (ie year, month, day format). This is done so we can extract the year from this data and add a year_added column as this is the data from the original column that we will actually be working with. After this, the data is completely prepared and analysis can begin.
+
+## Genre Popularity Over Time
+
+![Genre Popularity from 2000 to 2021](Graph1.png)
+
+### Statistical Analysis
+
+```{r}
+n_df %>%
+  separate_rows(listed_in, sep = ", ") %>%
+  count(release_year, listed_in) %>%
+  group_by(listed_in) %>%
+  filter(sum(n) >= 50) %>% 
+  filter(listed_in != "Movies") %>%
+  arrange(n) -> g_df
+
+g_df %>%
+  pivot_wider(names_from = listed_in, values_from = n, values_fill = 0) %>%
+  column_to_rownames("release_year") %>%
+  as.matrix() -> g_matrix
+
+chisq.test(g_matrix)
+chisq.test(g_matrix, simulate.p.value = TRUE)
+
+```
+
+A chi-squared test of independence was used to examine the relationship between genre and release year. After conducting the chi-squared test of independence regularly an error appeared stating "Chi-squared approximation may be incorrect". This error is due to the combinations of genres and years that had smaller sample sized. With this we achieved a p-value of 2.2 x 10^-16^. This value is less than out alpha value of 0.01 and therefore we can state that our results are statistically significant. A traditional chi-squared test of independence relies on theoretical approximation that assumes all sample are sufficiently large. So, to account for the errors that come with smaller samples we conducted a second chi-squared test of independence, this time with simulated p-values to make up for this shortcoming. Simulated p-values addresses this issue by repeated random sampling to estimate the p-value using simulated data which allows us to increase the accuracy of our results with smaller samples. With this we achieved a p-value of 0.0004998. This value remains less than our alpha value of 0.01 so, it can be confidently concluded that our results are statistically significant.
+
+### Insights
+
+From our statistical analysis we can conclude that there has been a shift in genre preferences across Netflix over time. Certain genres have seen an increase across time while others have seen a decrease. This indicates that the demand from audiences in not static but instead dynamic often shifting alongside cultural trends, changes in technology, and viewer habits.
+
+### Business Recommendation
+
+The insights discerned from our statistical analysis highlight the importance of adapting Netflix content so that it aligns with current viewer interests. It is recommended that Netflix consistently monitor genre trends and invest in those that are on the rise. Maintaining a fixed mix of content is an ineffective strategy. An always adapting, dynamic approach to selecting content genres puts Netflix in a better position to maximize viewer engagement. The streaming market is expanding and maximizing viewer engagement allows Netflix to remain competitive.
+
+## US vs International Content
+
+![Density Graph of US vs Internationally Produced Content from 2000 to 2021](Graph2.png)
+
+### Statistical Analysis
+
+```{r}
+n_df %>%
+  separate_rows(country, sep = ", ") %>%
+  filter(country != "") %>%
+  mutate(country = ifelse(country == "United States", "United States", "International")) %>%
+  count(release_year, country) -> us_df_counts
+
+us_df_counts %>%
+  pivot_wider(names_from = country, values_from = n, values_fill = 0) %>%
+  column_to_rownames("release_year") %>%
+  as.matrix() -> c_matrix
+
+chisq.test(c_matrix)
+```
+
+A chi-squared test of independence was used to examine the relationship between content production country and release year. After conducting the test, we received a p-value of 1.744 x 10^5^. The value is less than our alpha value of 0.01 and so we can say our results are statistically significant.
+
+### Insights
+
+From our statistical analysis we can deduce that the proportion of international and domestic content has shifted over time. This leads us to the conclusion that Netflix has become increasingly diverse across the years. In earlier years we see a greater dominance in US produced content but as time has progress we have seen a larger and larger international presence.
+
+### Business Recommendation
+
+Through our insights from our statistical analysis, it can be concluded that Netflix should continue their investment in international content for their platform. Netflix as a platform has become increasingly global and expanding their content libraries to include more diverse content allows them to appeal to larger audiences. This paired with the fact that "international movies" has been the genre with the largest growth since 2000 provides clear insight into the marketing strategy Netflix should adapt. Building partnerships outside of the US will allow Netflix to remain competitive in a global market.
+
+## Top Netflix Directors
+
+![Top Directors on Netflix from 2000 to 2021](Graph3.png)
+
+### Statistical Analysis
+
+```{r}
+n_df %>%
+  filter(director != "") %>%
+  separate_rows(director, sep = ", ") %>%
+  count(director) -> alldir_df
+
+summary(alldir_df$n)
+sd(alldir_df$n)
+quantile(alldir_df$n, probs = c(0.5, 0.9, 0.95, 0.99))
+```
+
+Distribution analysis was conducted to examine the spread of director contribution across Netflix. The maximum number of movies a single director has published on Netflix is 22 with only 8 directors having more than 10 directing credits and only 923 out of 4729 directors have more than 1 directing credit. 99% of directors have 6 or fewer titles which highlights that the data is largely right-skewed.
+
+### Insights
+
+Our statistical analysis reveals a highly skewed distribution of director output. The median, first quartile, and third quartile are all equal to one, indicating that at least 75% of directors have only a single title on Netflix. However, the maximum number of titles by a single director is twenty two, and the mean is greater than the median which further confirms that we have a strongly right-skewed distribution. Additionally, 90% of directors have two or fewer titles, and 99% have six or fewer, which highlights that a small number of directors contribute disproportionately to Netflix’s content library
+
+### Business Recommendation
+
+This distribution highlights Netflix's reliance on a few very high producing directors while the majority of the platform is filled with directors contributing only a single title. While Netflix should continue to maintain strong bonds with the small majority of high producing directors, it's risky to put all the eggs in one basket. Netflix should focus on identifying emerging directors and giving them a platform to grow on Netflix. This allows Netflix to build a diverse director base and decrease reliance on a small group. Additionally, this will allow Netflix to foster innovation in media and broaden their content offerings.
+
+## Genre Distribution by Region
+
+![Genre Distribution by Region from 2000 to 2021](Graph4.png)
+
+### Statistical Analysis
+
+```{r}
+n_df %>%
+  separate_rows(listed_in, sep = ", ") %>%
+  separate_rows(country, sep = ", ") %>%
+  filter(listed_in != "") %>%
+  mutate(country = ifelse(country == "United States", "United States", "International")) %>%
+  count(country, listed_in) -> usg_df_counts
+
+usg_df_counts %>%
+  pivot_wider(names_from = listed_in, values_from = n, values_fill = 0) %>%
+  column_to_rownames("country") %>%
+  as.matrix() -> usg_matrix
+
+chisq.test(usg_matrix)
+chisq.test(usg_matrix, simulate.p.value = TRUE)
+```
+
+A chi-squared test of independence was used to examine the relationship between genre distribution across countries of production. After conducting the chi-squared test of independence regularly an error appeared stating "Chi-squared approximation may be incorrect". Similarly to earlier tests, this happened due to lower sample sizes across certain genres in certain countries. With this we achieved a p-value of 2.2 x 10^-16^. This value is less than out alpha value of 0.01 and therefore we can state that our results are statistically significant. Similarly to our testing on our first graph, to account for the errors that come with smaller samples we conducted a second chi-squared test of independence, this time with simulated p-values to make up for the smaller samples in the data. With this we achieved a p-value of 0.0004998. This value remains less than our alpha value of 0.01 so, it can be confidently concluded that our results are statistically significant.
+
+### Insights
+
+After statistical analysis, we can conclude that genre preference varies from the US vs Internationally. This confirms that genre preference isn't uniform globally but instead dynamic reflecting regional and cultural preferences in media that is consumed.
+
+### Business Recommendation
+
+These insights make it clear that Netflix cannot use a one-size fits all method for their content strategy but instead must adopt a regional strategy instead. Investment should be made based on genre performance regionally and recommendation algorithms should take this into consideration when suggesting new content for viewers. This allows for a more personalized and tailored user experience that will allow for increased user engagement on the platform.
+
+## Movie Duration Trends
+
+![Movie Duration Distribution from 2000 to 2021](Graph5.png)
+
+### Statistical Analysis
+
+```{r}
+n_df %>%
+  filter(type == "Movie", duration != "") %>%
+  mutate(duration = parse_number(duration)) -> md_df
+
+aov_result <- aov(duration ~ as.factor(release_year), data = md_df)
+summary(aov_result)
+TukeyHSD(aov_result)
+```
+
+An ANOVA test was conducted to determine if there is a difference in movie duration over the years. Our ANOVA gave us a p-value of 2 x 10^-16^. This p-value is lower significantly than our alpha value of 0.01 which means our results are statistically significant and movie lengths do vary depending on release year. Additionally, our f-value was 13.48 and since this is so high we can conclude that the variance is due to the effect of the independent variable (year) rather than just random chance. After we conducted our ANOVA test, a Tukey test was conducted to determine which years are the most different.
+
+### Insights
+
+Statistical analysis confirms that average movie duration has been decreasing since year 2000. Based on our tests there has been a general decline in average movie duration since 2000 with the biggest drop starting during the time frame of 2013 to 2015 with the average still falling since then.
+
+### Business Recommendation
+
+Based on our insights we can conclude that there has been a decrease in average movie duration probably relating to decrease in attention span in modern days. Netflix should continue to maintain a content library that aligns with audience expectations of movie duration. Having consistency in this area will help to keep viewer retention high. It's also important to note that while average movie duration has decreased, the graph reveals that maximum movie durations have increased indicating that Netflix can strategically use smaller numbers of longer films to better fit certain genres or target audiences.
+
+## TV Show Length vs Audience Ratings
+
+![Number of Seasons by Age Rating from 2000 to 2021](Graph6.png)
+
+### Statistical Analysis
+
+```{r}
+n_df %>%
+  filter(type == "TV Show", rating != "", rating != "NR", duration != "") %>%
+  mutate(duration = parse_number(duration)) %>%
+  group_by(rating) %>%
+  filter(n() >= 10) %>%
+  mutate(rating = factor(rating, levels = c("TV-Y", "TV-Y7", "TV-G", "TV-PG", "TV-14", "TV-MA"))) -> mr_df
+
+kruskal.test(duration ~ rating, data = mr_df)
+pairwise.wilcox.test(mr_df$duration, mr_df$rating, p.adjust.method = "bonferroni")
+```
+
+A Kruskal-Wallis test was conducted to determine if there is variance in the number of seasons a show has based on its age rating. The Kruskal-Wallis test is the non-parametric (or assumptionless) version of the ANOVA test. This test gave us a p-value of 4.668 x 10^-12^ which is less than our alpha value of 0.01. We can therefore conclude our results are statistically significant and there is variance in the number of seasons a show has based on its age rating. Pairwise testing reveals that the difference is stark between the groupings of TV-Y and TV-Y7 against the groupings of TV-G, TV-PG, TV-14, and TV-MA. The difference is negligible between intergroup ratings however.
+
+### Insights
+
+Statistical analysis reveals that the number of seasons a show has isn't consistent across all age ratings. This means that target audience has an influence over the length of time a show runs. Shows targeted at younger audiences tend to last significantly shorter than those targeted at older audiences.
+
+### Business Recommendation
+
+Our insights reveal that Netflix should consider target audience when considering content to invest in. TV Shows targeted at more mature audiences are the most likely to run for multiple seasons and maintain viewership. This allows Netflix to garner a better understanding of what shows they should invest resources into in a way that maximizes viewer retention. Investing in genres for older individuals such as teenagers and adults who can keep up with on-going plot lines increases the likelihood of sustained engagement and long-term success which is more profitable for the company as a whole.
+
+## Top Actors on Netflix
+
+![Top US Actors on Netflix from 2000 to 2021](Graph7.png)
+
+### Statistical Analysis
+
+```{r}
+n_df %>%
+  filter(cast != "") %>% 
+  separate_rows(cast, sep = ", ") %>% 
+  count(cast) -> allcast_df
+
+chisq.test(allcast_df$n)
+chisq.test(allcast_df$n, simulate.p.value = TRUE)
+```
+
+A chi-squared goodness of fit was conducted to determine if certain actors are more prevalent that others on Netflix. After conducting the chi-squared goodness of fit test regularly an error appeared stating "Chi-squared approximation may be incorrect". Similarly to earlier tests, this happened due to lower sample sizes of certain actors. With this we achieved a p-value of 2.2 x 10^-16^. This value is less than out alpha value of 0.01 and therefore we can state that our results are statistically significant. Similarly to our testing on our first graph, to account for the errors that come with smaller samples we conducted a second chi-squared goodness of fit test, this time with simulated p-values to make up for the smaller samples in the data. With this we achieved a p-value of 0.0004998. This value remains less than our alpha value of 0.01 so, it can be confidently concluded that our results are statistically significant.
+
+### Insights
+
+Our analysis reveals that actor representation across Netflix is very skewed with only 35 individuals appearing in more than 10 US productions. This means there are a very few number of individuals dominating the Netflix screen.
+
+### Business Recommendation
+
+Our insights reveal that Netflix relies on a handful of very famous and recognizable actors across the platform. This isn't a bad thing and Netflix should continue to leverage actors who have such a strong presence on the platform. However, similarly to directors, Netflix should also work to invest in emerging talent and provide them the platform to grow. Expanding the library of actors being worked with while still maintaining strong relationships with recognizable faces increases diversity on the platform and allows for the attraction of a broad range of viewers.
+
+## Delay Between Release Date and Addition to Netflix
+
+![Delay Between Conteent Release Date and Netflix Addition Date from 2000 to 2021](Graph8.png)
+
+### Statistical Analysis
+
+```{r}
+n_df %>%
+  filter(year_added != "NA") %>%
+  mutate(delay = year_added - release_year) %>%
+  count(release_year, delay) -> d_df
+
+cor.test(d_df$release_year, d_df$delay)
+```
+
+A correlation test was conducted to determine the relationship between content release year and the amount of time it took for the content to be added to Netflix. When running the correlation test the correlation coefficient was -0.8873568 which implies a strong negative correlation between content release date and the time it takes for it to get added to Netflix.
+
+### Insights
+
+Statistical analysis reveals that the older a piece of media is, the longer it takes for it to get added to Netflix. Majority of shows and films released in 2015 and later were added within a year of its release while content from the early 2000s, on average, weren't added to the platform until the late 2010s into the 2020s which is nearly 2 decades later. These older and more delayed pieces of content make up a much smaller piece of Netflix's content library than the newer additions.
+
+### Business Recommendation
+
+These insights suggest that Netflix should prioritize adding content to their platform as soon as possible to minimize the delay in addition. Faster addition to the platform allows for increased viewer engagement and provides an opportunity to cash in on the "clout" that certain shows and movies bring before it inevitably dies off. Netflix should focus on strengthening ties with production companies to ensure that they garner distribution rights as soon as possible. When people search for new media, we want Netflix's name right at the top of search results. This positions Netflix well in the streaming industry as they will be seen as a reliable source for trendy and relevant media.
